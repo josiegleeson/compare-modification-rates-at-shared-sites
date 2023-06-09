@@ -1,6 +1,6 @@
 
 # execute as:
-# Rscript name.R high_confidence_modification_sites_from_m6anet.csv gencode.gtf brain_region
+# Rscript part1_annotate_modification_sites.R high_confidence_modification_sites_from_m6anet.csv gencode.gtf
 
 suppressPackageStartupMessages({
   library(tidyverse)
