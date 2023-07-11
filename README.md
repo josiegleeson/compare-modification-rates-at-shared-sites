@@ -1,3 +1,3 @@
-# Find differences in m6A levels between sites in different transcripts encoded by the same genomic position
+# Compare m6A modification rates between shared sites in different transcriptisoforms encoded by the same gene
 
-Uses the results from m6anet to test for differences in the m6A levels within multiple transcript isoforms that encode the same genomic position.
+Uses the output from m6anet to test for differences in the m6A modification rates within multiple transcript isoforms that encode the same genomic position.
