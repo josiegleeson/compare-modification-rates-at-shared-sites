@@ -1,6 +1,7 @@
 
 # execute as:
 # Rscript compare_modification_rates_at_shared_genomic_positions.R high_confidence_modification_sites_from_m6anet.csv brain_region
+
 suppressPackageStartupMessages({
   library(tidyverse)
   library(data.table)
@@ -16,24 +17,22 @@ args <- commandArgs(trailingOnly = TRUE)
 
 # command line variables
 
-# annotated modification sites from m6anet with genomic positions
+# annotated modification sites from m6anet with genomic positions (output from annotation script)
 annotated_modification_sites <- fread(args[1])
-
 brain_region <- args[2]
 
 if (brain_region == "all") {
-  # filter for at least 3 obs per site within a transcript and multiple transcripts per gene
+  # filter for at least 3 obs per site within a transcript, more than 1 brain region, multiple transcripts per gene
   mod_sites_for_testing <- annotated_modification_sites %>% 
     group_by(gene_id, genome_pos, transcript_id) %>% 
     dplyr::filter(n() >= 3 & length(unique(group_id))>1) %>% 
-    dplyr::filter(length(unique(mod_ratio)) > 1) %>% 
     group_by(gene_id, genome_pos) %>% 
     dplyr::filter(length(unique(transcript_id)) > 1) %>% 
     ungroup() %>% 
     mutate(genome_locus = paste0(gene_id, "_", genome_pos)) %>% 
     mutate(across(where(is.character), as.factor))
 } else {
-  # filter for more than 1 samples per site within a transcript and multiple transcripts per gene
+  # filter for at least 2 obs per site within a transcript and multiple transcripts per gene
   mod_sites_for_testing <- annotated_modification_sites %>% 
     dplyr::filter(group_id == paste0(brain_region)) %>% 
     group_by(gene_id, genome_pos, transcript_id) %>% 
@@ -49,7 +48,7 @@ if (brain_region == "all") {
 # define pairwise proportion test function
 perform_prop_analysis <- function(df) {
 
-  # metadata
+  # create df for testing
   per_transcript <- df %>% 
         group_by(genome_locus,gene_name,gene_id,transcript_id,transcript_length,dist_up_exon_junc,dist_down_exon_junc,exon_type,region,transcript_type) %>% 
         summarise(mean_mod_ratio = mean(mod_ratio),
@@ -64,7 +63,7 @@ perform_prop_analysis <- function(df) {
     dplyr::select(mean_mod_reads,mean_unmod_reads)
   matrix_to_test <- as.matrix(matrix_to_test)
 
-  # apply prop test
+  # apply two-proportions z-test
   prop_test_results <- tidy(pairwise.prop.test(matrix_to_test, p.adjust.method="none", alternative = c("two.sided"), correct=FALSE))
   
   # rename for merging
@@ -88,7 +87,7 @@ perform_prop_analysis <- function(df) {
                                                            gene_id.x = "gene_id",
                                                            gene_name.x = "gene_name")) %>% dplyr::select(-genome_locus.y,-gene_id.y,-gene_name.y)
 
-  # tidy
+  # tidy the output
   results <- m6a_diff_merged %>% rowwise() %>% mutate(mod_ratio_diff = mean_mod_ratio_group1 - mean_mod_ratio_group2,
                                                       transcript_length_difference = transcript_length_group1 - transcript_length_group2,
                                                       dist_up_exon_junc_diff = dist_up_exon_junc_group1 - dist_up_exon_junc_group2,
@@ -109,15 +108,18 @@ perform_prop_analysis <- function(df) {
   return(results)
 }
 
-
 # split df by shared genomic position
 list_mod_sites_for_testing <- split(mod_sites_for_testing, mod_sites_for_testing$genome_locus)
-# apply proportion test to all shared sites
+
+# apply two-proportions z-test function to all shared sites
 mod_sites_results_list_prop <- map(list_mod_sites_for_testing, perform_prop_analysis)
+
 # combine results output
 mod_sites_results_prop <- bind_rows(mod_sites_results_list_prop, .id = "genome_locus")
+
 # adjust p vals
 mod_sites_results_prop$padj <- p.adjust(mod_sites_results_prop, method="fdr", n=nrow(mod_sites_results_prop))
+
 # export file
 write.csv(mod_sites_results_prop, paste0("prop_z_test_results_sum_reads_none_", brain_region, ".csv"), row.names=F, quote=F)
 
