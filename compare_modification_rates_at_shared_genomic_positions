@@ -118,7 +118,11 @@ mod_sites_results_list_prop <- map(list_mod_sites_for_testing, perform_prop_anal
 mod_sites_results_prop <- bind_rows(mod_sites_results_list_prop, .id = "genome_locus")
 
 # adjust p vals
-mod_sites_results_prop$padj <- p.adjust(mod_sites_results_prop, method="fdr", n=nrow(mod_sites_results_prop))
+if (nrow(mod_sites_results_prop)>1) {
+  mod_sites_results_prop$padj <- p.adjust(mod_sites_results_prop$p.value, method="fdr", n=nrow(mod_sites_results_prop))
+} else {
+  mod_sites_results_prop$padj <- mod_sites_results_prop$p.value
+}
 
 # export file
 write.csv(mod_sites_results_prop, paste0("prop_z_test_results_sum_reads_none_", brain_region, ".csv"), row.names=F, quote=F)
